@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://localhost:3000';
+const BACKEND_URL = 'https://xenocrm-backend-wuqn.onrender.com';
 
 export async function checkHealth() {
   const res = await fetch(`${BACKEND_URL}/health`);
@@ -98,7 +98,7 @@ export async function fetchAnalyticsSummary() {
 }
 
 // AI Service Direct Utilities
-const AI_SERVICE_URL = 'http://localhost:5002';
+const AI_SERVICE_URL = 'https://xenocrm-ai.onrender.com';
 
 export async function generateAIMessage(prompt, channel) {
   const res = await fetch(`${AI_SERVICE_URL}/api/ai/message`, {

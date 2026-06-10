@@ -25,7 +25,7 @@ router.post('/ai-parse', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter is required.' });
     }
 
-    const aiServiceUrl = `${process.env.AI_SERVICE_URL || 'http://localhost:5002'}/api/ai/segment`;
+    const aiServiceUrl = `${process.env.AI_SERVICE_URL || 'https://xenocrm-ai.onrender.com'}/api/ai/segment`;
     
     let aiResponse;
     try {

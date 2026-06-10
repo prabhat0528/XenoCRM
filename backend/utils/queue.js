@@ -133,10 +133,10 @@ async function processNextJob() {
           recipient,
           channel: campaign.channel,
           message: personalizedMessage,
-          callbackUrl: process.env.CALLBACK_URL || 'http://localhost:5000/api/webhooks/delivery-callback'
+          callbackUrl: process.env.CALLBACK_URL || 'https://xenocrm-backend-wuqn.onrender.com/api/webhooks/delivery-callback'
         };
 
-        const channelUrl = `${process.env.CHANNEL_SERVICE_URL || 'http://localhost:5001'}/api/send`;
+        const channelUrl = `${process.env.CHANNEL_SERVICE_URL || 'https://xenocrm-channel-service.onrender.com'}/api/send`;
         
         // Asynchronously post to Channel Service
         await axios.post(channelUrl, payload, { timeout: 2000 });
