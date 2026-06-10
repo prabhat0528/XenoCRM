@@ -5,7 +5,7 @@ const { connectDB } = require('./utils/db');
 const { startQueue } = require('./utils/queue');
 
 const app = express();
-const PORT = envConfig.PORT || 5000;
+const PORT = process.env.PORT || envConfig.PORT || 5000;
 
 // Global process error handlers to prevent crashes and print stack traces
 process.on('uncaughtException', (err) => {
