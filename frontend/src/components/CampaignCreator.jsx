@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createCampaign, launchCampaign, generateAIMessage, fetchAIRecommendation } from '../utils/api';
+import { createCampaign, launchCampaign, generateAIMessage, fetchAIRecommendation, fetchSegmentMembers } from '../utils/api';
 
 export default function CampaignCreator({ selectedSegment, selectedSegmentLabel, campaignDraft, clearCampaignDraft, onNavigateToTracking }) {
   // Campaign Form State
@@ -10,6 +10,12 @@ export default function CampaignCreator({ selectedSegment, selectedSegmentLabel,
     segmentCriteria: null
   });
 
+  // Preview States
+  const [previewMembers, setPreviewMembers] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [expandedCustomerId, setExpandedCustomerId] = useState(null);
+
   // Keep segment in sync with parent select
   useEffect(() => {
     if (selectedSegment) {
@@ -17,6 +23,8 @@ export default function CampaignCreator({ selectedSegment, selectedSegmentLabel,
         ...prev,
         segmentCriteria: selectedSegment
       }));
+      setShowPreview(false);
+      setPreviewMembers([]);
     }
   }, [selectedSegment]);
 
@@ -30,8 +38,32 @@ export default function CampaignCreator({ selectedSegment, selectedSegmentLabel,
         segmentCriteria: campaignDraft.segmentCriteria || selectedSegment
       });
       clearCampaignDraft();
+      setShowPreview(false);
+      setPreviewMembers([]);
     }
   }, [campaignDraft]);
+
+  const handleTogglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+
+    if (!campaign.segmentCriteria) return;
+
+    setPreviewLoading(true);
+    try {
+      const data = await fetchSegmentMembers(campaign.segmentCriteria);
+      setPreviewMembers(data || []);
+      setShowPreview(true);
+      setExpandedCustomerId(null);
+    } catch (e) {
+      console.error('Failed fetching preview members:', e);
+      alert('Failed loading target shopper details.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   // AI Message Helper State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -163,6 +195,15 @@ export default function CampaignCreator({ selectedSegment, selectedSegmentLabel,
                         {JSON.stringify(campaign.segmentCriteria, null, 2)}
                       </pre>
                     </div>
+                    
+                    <button 
+                      className="btn btn-secondary btn-sm" 
+                      style={{ width: '100%', marginTop: '12px' }}
+                      onClick={handleTogglePreview}
+                      disabled={previewLoading}
+                    >
+                      {previewLoading ? '⏳ Loading Candidates...' : showPreview ? '👁️ Hide Candidate List' : '🔍 Preview Target Customers'}
+                    </button>
                   </div>
                 ) : (
                   <span style={{ color: 'var(--accent-red)' }}>⚠️ No segment selected. Please configure target segment first.</span>
@@ -276,6 +317,142 @@ export default function CampaignCreator({ selectedSegment, selectedSegmentLabel,
           </div>
         </div>
       </div>
+
+      {/* Shopper Details Preview Section */}
+      {showPreview && (
+        <div className="glass-panel" style={{ marginTop: '24px', animation: 'fadeIn 0.3s ease-in-out' }}>
+          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <span>👥 Target Campaign Shoppers Details ({previewMembers.length} found)</span>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowPreview(false)}>✕ Close</button>
+          </div>
+          
+          {previewMembers.length === 0 ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No candidates found matching the target segment criteria.
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="custom-table" style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr>
+                    <th>Customer Name</th>
+                    <th>Contact Info</th>
+                    <th>Location</th>
+                    <th>Aggregates</th>
+                    <th>Demographics</th>
+                    <th>Last Active</th>
+                    <th>Order History</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewMembers.map((member) => {
+                    const isExpanded = expandedCustomerId === member._id;
+                    return (
+                      <React.Fragment key={member._id}>
+                        <tr>
+                          <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                            {member.name}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem' }}>
+                              <span>📧 {member.email}</span>
+                              <span>📞 {member.phone}</span>
+                            </div>
+                          </td>
+                          <td>{member.city}</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem' }}>
+                              <span>Spent: <strong>₹{member.totalSpent || 0}</strong></span>
+                              <span>Orders: <strong>{member.totalOrders || 0}</strong></span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge pending" style={{ fontSize: '0.75rem', marginRight: '6px' }}>
+                              {member.demographics?.gender || 'N/A'}
+                            </span>
+                            <span className="badge sent" style={{ fontSize: '0.75rem' }}>
+                              Age: {member.demographics?.age || 'N/A'}
+                            </span>
+                          </td>
+                          <td>
+                            {member.lastOrderDate 
+                              ? new Date(member.lastOrderDate).toLocaleDateString()
+                              : 'Never'
+                            }
+                          </td>
+                          <td>
+                            <button 
+                              className={`btn btn-sm ${isExpanded ? 'btn-secondary' : 'btn-accent'}`}
+                              onClick={() => setExpandedCustomerId(isExpanded ? null : member._id)}
+                            >
+                              {isExpanded ? '🔼 Close Orders' : `🔽 View Orders (${member.orders?.length || 0})`}
+                            </button>
+                          </td>
+                        </tr>
+                        
+                        {/* Nested Orders Row (Accordion) */}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan="7" style={{ background: 'rgba(255,255,255,0.02)', padding: '15px 25px' }}>
+                              <div style={{ padding: '10px 0' }}>
+                                <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--accent-cyan)' }}>
+                                  📦 Order History for {member.name}
+                                </h4>
+                                
+                                {(!member.orders || member.orders.length === 0) ? (
+                                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>
+                                    No purchase orders logged for this customer.
+                                  </p>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {member.orders.map((ord, idx) => (
+                                      <div 
+                                        key={ord._id || idx}
+                                        style={{ 
+                                          display: 'flex', 
+                                          flexDirection: 'column',
+                                          gap: '8px',
+                                          padding: '12px',
+                                          background: 'rgba(0,0,0,0.2)',
+                                          border: '1px solid rgba(255,255,255,0.03)',
+                                          borderRadius: '8px',
+                                          fontSize: '0.85rem'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                          <span><strong>Order ID:</strong> <code style={{ color: 'var(--accent-violet)' }}>{ord._id}</code></span>
+                                          <span><strong>Date:</strong> {new Date(ord.orderDate).toLocaleDateString()}</span>
+                                          <span><strong>Amount:</strong> <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>₹{ord.amount}</span></span>
+                                          <span>
+                                            <span className={`badge ${ord.status === 'Completed' ? 'delivered' : 'failed'}`}>
+                                              {ord.status || 'Completed'}
+                                            </span>
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <strong>Products:</strong>{' '}
+                                          {ord.products && ord.products.length > 0 
+                                            ? ord.products.join(', ') 
+                                            : 'No products listed'
+                                          }
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

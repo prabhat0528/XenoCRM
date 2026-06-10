@@ -57,6 +57,15 @@ export async function parseAISegment(query) {
   return res.json();
 }
 
+export async function fetchSegmentMembers(criteria) {
+  const res = await fetch(`${BACKEND_URL}/api/segments/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(criteria)
+  });
+  return res.json();
+}
+
 export async function fetchCampaigns() {
   const res = await fetch(`${BACKEND_URL}/api/campaigns`);
   return res.json();

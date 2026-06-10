@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { evaluateSegment, parseAISegment } from '../utils/api';
+import { evaluateSegment, parseAISegment, fetchSegmentMembers } from '../utils/api';
 
 export default function SegmentBuilder({ onSelectSegment }) {
   const [activeTab, setActiveTab] = useState('rules'); // 'rules' or 'nlp'
   
+  // Preview States
+  const [previewMembers, setPreviewMembers] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [expandedCustomerId, setExpandedCustomerId] = useState(null);
+  const [currentCriteria, setCurrentCriteria] = useState(null);
+
   // Rule State
   const [rules, setRules] = useState({
     city: '',
@@ -38,6 +45,10 @@ export default function SegmentBuilder({ onSelectSegment }) {
       const res = await evaluateSegment(cleanRules);
       setRuleCount(res.count);
       setRuleMongoQuery(res.mongoQuery);
+
+      setCurrentCriteria(cleanRules);
+      setShowPreview(false);
+      setPreviewMembers([]);
     } catch (e) {
       console.error('Failed evaluating rules size:', e);
     }
@@ -54,14 +65,39 @@ export default function SegmentBuilder({ onSelectSegment }) {
     if (!nlpQuery.trim()) return;
     setNlpLoading(true);
     setNlpParsed(null);
+    setShowPreview(false);
+    setPreviewMembers([]);
     try {
       const parsed = await parseAISegment(nlpQuery);
       setNlpParsed(parsed);
+      setCurrentCriteria(parsed.criteria);
     } catch (e) {
       console.error('Failed AI parse:', e);
       alert('AI analysis failed. Please check the AI Python service.');
     } finally {
       setNlpLoading(false);
+    }
+  };
+
+  const handleTogglePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+
+    if (!currentCriteria) return;
+
+    setPreviewLoading(true);
+    try {
+      const data = await fetchSegmentMembers(currentCriteria);
+      setPreviewMembers(data || []);
+      setShowPreview(true);
+      setExpandedCustomerId(null);
+    } catch (e) {
+      console.error('Failed fetching preview members:', e);
+      alert('Failed loading candidate details.');
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -200,6 +236,17 @@ export default function SegmentBuilder({ onSelectSegment }) {
                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Matching Customers</div>
               </div>
               
+              {ruleCount > 0 && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ width: '100%', marginBottom: '16px' }}
+                  onClick={handleTogglePreview}
+                  disabled={previewLoading}
+                >
+                  {previewLoading ? '⏳ Loading Candidates...' : showPreview ? '👁️ Hide Shoppers Detail' : '🔍 View Matching Shoppers'}
+                </button>
+              )}
+              
               <div style={{ marginTop: '20px' }}>
                 <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: 'var(--text-secondary)' }}>Generated MongoDB filter:</h4>
                 <pre style={{ 
@@ -266,6 +313,17 @@ export default function SegmentBuilder({ onSelectSegment }) {
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Matching Customers</div>
                 </div>
                 
+                {nlpParsed.audienceSize > 0 && (
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ width: '100%', marginBottom: '10px' }}
+                    onClick={handleTogglePreview}
+                    disabled={previewLoading}
+                  >
+                    {previewLoading ? '⏳ Loading Candidates...' : showPreview ? '👁️ Hide Shoppers Detail' : '🔍 View Matching Shoppers'}
+                  </button>
+                )}
+                
                 <div>
                   <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>AI Explanation:</h4>
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '4px', borderLeft: '2px solid var(--accent-pink)', paddingLeft: '8px' }}>
@@ -303,6 +361,142 @@ export default function SegmentBuilder({ onSelectSegment }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Shopper Details Preview Section */}
+      {showPreview && (
+        <div className="glass-panel" style={{ marginTop: '24px', animation: 'fadeIn 0.3s ease-in-out' }}>
+          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <span>👥 Candidate Shopper Details ({previewMembers.length} found)</span>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowPreview(false)}>✕ Close</button>
+          </div>
+          
+          {previewMembers.length === 0 ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No candidates found matching current criteria.
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="custom-table" style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr>
+                    <th>Customer Name</th>
+                    <th>Contact Info</th>
+                    <th>Location</th>
+                    <th>Aggregates</th>
+                    <th>Demographics</th>
+                    <th>Last Active</th>
+                    <th>Order History</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewMembers.map((member) => {
+                    const isExpanded = expandedCustomerId === member._id;
+                    return (
+                      <React.Fragment key={member._id}>
+                        <tr>
+                          <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                            {member.name}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem' }}>
+                              <span>📧 {member.email}</span>
+                              <span>📞 {member.phone}</span>
+                            </div>
+                          </td>
+                          <td>{member.city}</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem' }}>
+                              <span>Spent: <strong>₹{member.totalSpent || 0}</strong></span>
+                              <span>Orders: <strong>{member.totalOrders || 0}</strong></span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge pending" style={{ fontSize: '0.75rem', marginRight: '6px' }}>
+                              {member.demographics?.gender || 'N/A'}
+                            </span>
+                            <span className="badge sent" style={{ fontSize: '0.75rem' }}>
+                              Age: {member.demographics?.age || 'N/A'}
+                            </span>
+                          </td>
+                          <td>
+                            {member.lastOrderDate 
+                              ? new Date(member.lastOrderDate).toLocaleDateString()
+                              : 'Never'
+                            }
+                          </td>
+                          <td>
+                            <button 
+                              className={`btn btn-sm ${isExpanded ? 'btn-secondary' : 'btn-accent'}`}
+                              onClick={() => setExpandedCustomerId(isExpanded ? null : member._id)}
+                            >
+                              {isExpanded ? '🔼 Close Orders' : `🔽 View Orders (${member.orders?.length || 0})`}
+                            </button>
+                          </td>
+                        </tr>
+                        
+                        {/* Nested Orders Row (Accordion) */}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan="7" style={{ background: 'rgba(255,255,255,0.02)', padding: '15px 25px' }}>
+                              <div style={{ padding: '10px 0' }}>
+                                <h4 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--accent-cyan)' }}>
+                                  📦 Order History for {member.name}
+                                </h4>
+                                
+                                {(!member.orders || member.orders.length === 0) ? (
+                                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>
+                                    No purchase orders logged for this customer.
+                                  </p>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {member.orders.map((ord, idx) => (
+                                      <div 
+                                        key={ord._id || idx}
+                                        style={{ 
+                                          display: 'flex', 
+                                          flexDirection: 'column',
+                                          gap: '8px',
+                                          padding: '12px',
+                                          background: 'rgba(0,0,0,0.2)',
+                                          border: '1px solid rgba(255,255,255,0.03)',
+                                          borderRadius: '8px',
+                                          fontSize: '0.85rem'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                          <span><strong>Order ID:</strong> <code style={{ color: 'var(--accent-violet)' }}>{ord._id}</code></span>
+                                          <span><strong>Date:</strong> {new Date(ord.orderDate).toLocaleDateString()}</span>
+                                          <span><strong>Amount:</strong> <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>₹{ord.amount}</span></span>
+                                          <span>
+                                            <span className={`badge ${ord.status === 'Completed' ? 'delivered' : 'failed'}`}>
+                                              {ord.status || 'Completed'}
+                                            </span>
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <strong>Products:</strong>{' '}
+                                          {ord.products && ord.products.length > 0 
+                                            ? ord.products.join(', ') 
+                                            : 'No products listed'
+                                          }
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

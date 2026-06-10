@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const Customer = require('../models/Customer');
+const Order = require('../models/Order');
 const { buildMongoQuery } = require('../utils/queue');
 
 // Evaluate segment size based on criteria rules (without saving)
@@ -95,5 +96,27 @@ function fallbackNLPParser(text) {
 
   return { criteria, explanation };
 }
+
+// Get segment members with their nested orders
+router.post('/members', async (req, res) => {
+  try {
+    const criteria = req.body;
+    const mongoQuery = buildMongoQuery(criteria);
+    const customers = await Customer.find(mongoQuery).lean();
+
+    // Enrich customers with their order history
+    const enrichedMembers = await Promise.all(customers.map(async (c) => {
+      const orders = await Order.find({ customerId: c._id }).sort({ orderDate: -1 }).lean();
+      return {
+        ...c,
+        orders
+      };
+    }));
+
+    res.json(enrichedMembers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

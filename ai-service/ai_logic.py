@@ -8,9 +8,9 @@ import google.generativeai as genai
 API_KEY = os.getenv("GEMINI_API_KEY")
 if API_KEY:
     genai.configure(api_key=API_KEY)
-    print("✅ Gemini API configured.")
+    print("[AI-Service] Gemini API configured.")
 else:
-    print("⚠️ No GEMINI_API_KEY found. Using rule-based fallback model.")
+    print("[AI-Service] No GEMINI_API_KEY found. Using rule-based fallback model.")
 
 def get_gemini_model():
     if not API_KEY:
