@@ -9,11 +9,11 @@ const PORT = process.env.PORT || envConfig.PORT || 5000;
 
 // Global process error handlers to prevent crashes and print stack traces
 process.on('uncaughtException', (err) => {
-  console.error('🔥 UNCAUGHT EXCEPTION:', err.stack || err);
+  console.error('UNCAUGHT EXCEPTION:', err.stack || err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('🔥 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+  console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
 });
 
 // Middleware
@@ -59,7 +59,7 @@ async function bootstrap() {
   startQueue();
 
   app.listen(PORT, () => {
-    console.log(`🚀 CRM Backend Server running on port ${PORT}`);
+    console.log(`CRM Backend Server running on port ${PORT}`);
   });
 }
 
