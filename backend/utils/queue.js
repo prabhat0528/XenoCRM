@@ -109,8 +109,8 @@ async function processNextJob() {
       return;
     }
 
-    // 2. Dispatch messages in parallel
-    const sendPromises = customers.map(async (customer) => {
+    // 2. Dispatch messages sequentially with a small delay to avoid triggering Render's rate limiters
+    for (const customer of customers) {
       const personalizedMessage = compileTemplate(campaign.messageTemplate, customer);
       
       // Create a PENDING communication log
@@ -157,9 +157,10 @@ async function processNextJob() {
         // Update campaign failed count
         await Campaign.updateOne({ _id: campaign._id }, { $inc: { failedCount: 1 } });
       }
-    });
 
-    await Promise.all(sendPromises);
+      // Introduce a 200ms throttle delay to avoid 429 Too Many Requests from Render's load balancer
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
 
     campaign.status = 'Completed';
     await campaign.save();
