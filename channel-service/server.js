@@ -23,7 +23,7 @@ async function sendCallback(callbackUrl, logId, status) {
 
 // Check if running on Render free tier to accelerate background execution
 const isRender = process.env.RENDER === 'true';
-const speedFactor = isRender ? 0.05 : 1.0; // 20x faster on Render to complete tasks before CPU throttle
+const speedFactor = isRender ? 0.25 : 1.0; // Spaced out to 2.5 seconds to prevent DB lockups
 
 // Simulated campaign lifecycle processing function
 async function simulateLifecycle(logId, channel, callbackUrl) {
@@ -52,15 +52,19 @@ async function simulateLifecycle(logId, channel, callbackUrl) {
     }
     await sendCallback(callbackUrl, logId, 'DELIVERED');
 
-    // 3. OPENED
-    await delay((1200 + Math.random() * 1500) * speedFactor);
-    if (Math.random() > openRate) return;
-    await sendCallback(callbackUrl, logId, 'OPENED');
+    // 3. OPENED (Skipped on Render to prevent database connection exhaustion)
+    if (!isRender) {
+      await delay((1200 + Math.random() * 1500) * speedFactor);
+      if (Math.random() > openRate) return;
+      await sendCallback(callbackUrl, logId, 'OPENED');
+    }
 
-    // 4. READ
-    await delay((600 + Math.random() * 800) * speedFactor);
-    if (Math.random() > readRate) return;
-    await sendCallback(callbackUrl, logId, 'READ');
+    // 4. READ (Skipped on Render to prevent database connection exhaustion)
+    if (!isRender) {
+      await delay((600 + Math.random() * 800) * speedFactor);
+      if (Math.random() > readRate) return;
+      await sendCallback(callbackUrl, logId, 'READ');
+    }
 
     // 5. CLICKED
     await delay((1500 + Math.random() * 2000) * speedFactor);
