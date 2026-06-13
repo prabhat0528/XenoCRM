@@ -197,7 +197,7 @@ const connectDB = async () => {
 };
 
 function getModel(modelName, schemaObj) {
-  const schema = new mongoose.Schema(schemaObj);
+  const schema = new mongoose.Schema(schemaObj, { minimize: false });
 
   let mongooseModel;
 

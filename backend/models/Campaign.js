@@ -2,7 +2,7 @@ const { getModel } = require('../utils/db');
 
 const CampaignSchema = {
   name: { type: String, required: true },
-  segmentCriteria: { type: Object, required: true }, // Filter parameters or NLP queries
+  segmentCriteria: { type: Object, required: true, default: {} }, // Filter parameters or NLP queries
   messageTemplate: { type: String, required: true }, // e.g. "Hi {{name}}, we have 20% off for you!"
   channel: { type: String, required: true }, // "SMS", "Email", "WhatsApp", "RCS"
   status: { type: String, default: 'Draft' }, // "Draft", "Queued", "Processing", "Completed", "Failed"

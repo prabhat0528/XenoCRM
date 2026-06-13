@@ -81,6 +81,11 @@ router.post('/:id/send', async (req, res) => {
       return res.status(400).json({ error: 'Campaign is already queued or processing.' });
     }
 
+    // Defensive fallback: if segmentCriteria is undefined/missing in DB, default it to {}
+    if (!campaign.segmentCriteria) {
+      campaign.segmentCriteria = {};
+    }
+
     // Reset status trackers for retry/re-run
     campaign.status = 'Queued';
     campaign.sentCount = 0;
@@ -94,16 +99,18 @@ router.post('/:id/send', async (req, res) => {
 
     // Create queue execution Job
     const job = await Job.create({
-      campaignId: campaign._id,
+      campaignId: String(campaign._id),
       status: 'Pending',
       runAt: new Date()
     });
 
     res.json({ message: 'Campaign queued for dispatch.', campaign, jobId: job._id });
   } catch (err) {
+    console.error('[Campaign Send Endpoint Error]', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Clear all campaign data (for clean testing)
 router.delete('/all', async (req, res) => {
