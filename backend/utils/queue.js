@@ -58,10 +58,10 @@ function buildMongoQuery(criteria) {
 function compileTemplate(template, customer) {
   if (!template) return '';
   return template
-    .replace(/\{\{(name|customer_name)\}\}/gi, customer.name || '')
-    .replace(/\{\{(totalSpent|total_spent)\}\}/gi, customer.totalSpent !== undefined ? customer.totalSpent : 0)
-    .replace(/\{\{city\}\}/gi, customer.city || '')
-    .replace(/\{\{(totalOrders|total_orders)\}\}/gi, customer.totalOrders !== undefined ? customer.totalOrders : 0);
+    .replace(/\{{1,2}(name|customer_name)\}{1,2}/gi, customer.name || '')
+    .replace(/\{{1,2}(totalSpent|total_spent)\}{1,2}/gi, customer.totalSpent !== undefined ? customer.totalSpent : 0)
+    .replace(/\{{1,2}city\}{1,2}/gi, customer.city || '')
+    .replace(/\{{1,2}(totalOrders|total_orders)\}{1,2}/gi, customer.totalOrders !== undefined ? customer.totalOrders : 0);
 }
 
 let isProcessing = false;
