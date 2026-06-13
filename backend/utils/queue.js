@@ -138,8 +138,26 @@ async function processNextJob() {
 
         const channelUrl = `${process.env.CHANNEL_SERVICE_URL || 'https://xenocrm-channel-service.onrender.com'}/api/send`;
         
-        // Asynchronously post to Channel Service
-        await axios.post(channelUrl, payload, { timeout: 2000 });
+        // Retry logic for 429 rate limits
+        let success = false;
+        let dispatchAttempts = 0;
+        const maxDispatchAttempts = 3;
+        
+        while (!success && dispatchAttempts < maxDispatchAttempts) {
+          try {
+            dispatchAttempts++;
+            await axios.post(channelUrl, payload, { timeout: 2500 });
+            success = true;
+          } catch (err) {
+            const isRateLimit = err.response && err.response.status === 429;
+            if (isRateLimit && dispatchAttempts < maxDispatchAttempts) {
+              console.warn(`[Queue Worker] Rate limited (429) when sending to ${customer.name}. Retrying in 1.5s... (Attempt ${dispatchAttempts}/${maxDispatchAttempts})`);
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            } else {
+              throw err; // Fail if it's a different error or we ran out of attempts
+            }
+          }
+        }
         
         // Update local log status to SENT (will be updated further via webhook callbacks)
         log.status = 'SENT';

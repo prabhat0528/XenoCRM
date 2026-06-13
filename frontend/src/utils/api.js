@@ -1,4 +1,5 @@
-const BACKEND_URL = 'https://xenocrm-backend-wuqn.onrender.com';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_URL = isLocalhost ? 'http://localhost:5000' : 'https://xenocrm-backend-wuqn.onrender.com';
 
 export async function checkHealth() {
   const res = await fetch(`${BACKEND_URL}/health`);
@@ -98,7 +99,7 @@ export async function fetchAnalyticsSummary() {
 }
 
 // AI Service Direct Utilities
-const AI_SERVICE_URL = 'https://xenocrm-ai.onrender.com';
+const AI_SERVICE_URL = isLocalhost ? 'http://localhost:5002' : 'https://xenocrm-ai.onrender.com';
 
 export async function generateAIMessage(prompt, channel) {
   const res = await fetch(`${AI_SERVICE_URL}/api/ai/message`, {

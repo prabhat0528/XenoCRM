@@ -95,5 +95,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(3001, () => {
-  console.log(`📡 Simulated Channel Service running on port 3001`);
+  console.log(` Simulated Channel Service running on port 3001`);
 });
