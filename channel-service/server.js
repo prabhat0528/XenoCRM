@@ -21,6 +21,10 @@ async function sendCallback(callbackUrl, logId, status) {
   }
 }
 
+// Check if running on Render free tier to accelerate background execution
+const isRender = process.env.RENDER === 'true';
+const speedFactor = isRender ? 0.05 : 1.0; // 20x faster on Render to complete tasks before CPU throttle
+
 // Simulated campaign lifecycle processing function
 async function simulateLifecycle(logId, channel, callbackUrl) {
   // Define probabilities based on channel
@@ -37,11 +41,11 @@ async function simulateLifecycle(logId, channel, callbackUrl) {
 
   try {
     // 1. SENT
-    await delay(300 + Math.random() * 500);
+    await delay((300 + Math.random() * 500) * speedFactor);
     await sendCallback(callbackUrl, logId, 'SENT');
 
     // 2. DELIVERED or FAILED
-    await delay(800 + Math.random() * 1000);
+    await delay((800 + Math.random() * 1000) * speedFactor);
     if (Math.random() < failRate) {
       await sendCallback(callbackUrl, logId, 'FAILED');
       return;
@@ -49,22 +53,22 @@ async function simulateLifecycle(logId, channel, callbackUrl) {
     await sendCallback(callbackUrl, logId, 'DELIVERED');
 
     // 3. OPENED
-    await delay(1200 + Math.random() * 1500);
+    await delay((1200 + Math.random() * 1500) * speedFactor);
     if (Math.random() > openRate) return;
     await sendCallback(callbackUrl, logId, 'OPENED');
 
     // 4. READ
-    await delay(600 + Math.random() * 800);
+    await delay((600 + Math.random() * 800) * speedFactor);
     if (Math.random() > readRate) return;
     await sendCallback(callbackUrl, logId, 'READ');
 
     // 5. CLICKED
-    await delay(1500 + Math.random() * 2000);
+    await delay((1500 + Math.random() * 2000) * speedFactor);
     if (Math.random() > clickRate) return;
     await sendCallback(callbackUrl, logId, 'CLICKED');
 
     // 6. PURCHASED (Conversion)
-    await delay(2000 + Math.random() * 2500);
+    await delay((2000 + Math.random() * 2500) * speedFactor);
     if (Math.random() > purchaseRate) return;
     await sendCallback(callbackUrl, logId, 'PURCHASED');
 
