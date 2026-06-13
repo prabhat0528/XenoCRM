@@ -214,11 +214,20 @@ function getModel(modelName, schemaObj) {
 
   return new Proxy({}, {
     get(target, prop) {
-      const activeModel = useMock ? mockModel : mongooseModel;
-      const value = activeModel[prop];
+      if (useMock) {
+        const value = mockModel[prop];
+
+        if (typeof value === 'function') {
+          return value.bind(mockModel);
+        }
+
+        return value;
+      }
+
+      const value = mongooseModel[prop];
 
       if (typeof value === 'function') {
-        return value.bind(activeModel);
+        return value.bind(mongooseModel);
       }
 
       return value;
