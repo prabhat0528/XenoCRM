@@ -151,8 +151,17 @@ async function processNextJob() {
           } catch (err) {
             const isRateLimit = err.response && err.response.status === 429;
             if (isRateLimit && dispatchAttempts < maxDispatchAttempts) {
-              console.warn(`[Queue Worker] Rate limited (429) when sending to ${customer.name}. Retrying in 1.5s... (Attempt ${dispatchAttempts}/${maxDispatchAttempts})`);
-              await new Promise(resolve => setTimeout(resolve, 1500));
+              // Parse the standard 'Retry-After' header (if sent by Cloudflare/Render)
+              let retrySeconds = 2; 
+              const retryHeader = err.response.headers && err.response.headers['retry-after'];
+              if (retryHeader) {
+                const parsed = parseInt(retryHeader, 10);
+                if (!isNaN(parsed)) {
+                  retrySeconds = parsed;
+                }
+              }
+              console.warn(`[Queue Worker] Rate limited (429) when sending to ${customer.name}. Retrying in ${retrySeconds}s... (Attempt ${dispatchAttempts}/${maxDispatchAttempts})`);
+              await new Promise(resolve => setTimeout(resolve, retrySeconds * 1000));
             } else {
               throw err; // Fail if it's a different error or we ran out of attempts
             }
