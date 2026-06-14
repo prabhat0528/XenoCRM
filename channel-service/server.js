@@ -14,7 +14,8 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Send callback back to the CRM backend
 async function sendCallback(callbackUrl, logId, status) {
   try {
-    await axios.post(callbackUrl, { logId, status }, { timeout: 2000 });
+    // 45 seconds timeout to wait for CRM backend to wake up from sleep
+    await axios.post(callbackUrl, { logId, status }, { timeout: 45000 });
     console.log(`[Channel Service] Callback success: Log ID ${logId} -> ${status}`);
   } catch (err) {
     console.error(`[Channel Service] Callback failed for Log ID ${logId} (${status}):`, err.message);

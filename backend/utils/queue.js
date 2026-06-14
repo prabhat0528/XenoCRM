@@ -164,7 +164,8 @@ async function processNextJob() {
             if (isRetryable && dispatchAttempts < maxDispatchAttempts) {
               let retrySeconds = 5; // Default 5 seconds cooldown to let server boot/recover
               if (status === 429) {
-                retrySeconds = 3;
+                // Exponential backoff: 3s, 5s, 9s, 17s...
+                retrySeconds = Math.pow(2, dispatchAttempts) + 1;
                 const retryHeader = err.response.headers && err.response.headers['retry-after'];
                 if (retryHeader) {
                   const parsed = parseInt(retryHeader, 10);
@@ -198,8 +199,8 @@ async function processNextJob() {
         await Campaign.updateOne({ _id: campaign._id }, { $inc: { failedCount: 1 } });
       }
 
-      // Introduce a 1000ms (1s) throttle delay to avoid 429 Too Many Requests from Render's load balancer
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Introduce a 3000ms (3s) throttle delay to avoid 429 Too Many Requests from Render's load balancer
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
     campaign.status = 'Completed';
@@ -233,6 +234,31 @@ let intervalId = null;
 function startQueue() {
   if (intervalId) return;
   console.log('[Queue Worker] Background queue processing initialized.');
+
+  // Recover stuck jobs asynchronously on boot (e.g., from container restarts)
+  (async () => {
+    try {
+      const Job = require('../models/Job');
+      const Campaign = require('../models/Campaign');
+      
+      const jobsRecovered = await Job.updateMany(
+        { status: 'Processing' },
+        { $set: { status: 'Pending' } }
+      );
+      
+      const campaignsRecovered = await Campaign.updateMany(
+        { status: 'Processing' },
+        { $set: { status: 'Queued' } }
+      );
+      
+      if (jobsRecovered.modifiedCount > 0 || campaignsRecovered.modifiedCount > 0) {
+        console.log(`[Queue Worker] Startup recovery complete: Recovered ${jobsRecovered.modifiedCount} stuck processing jobs and ${campaignsRecovered.modifiedCount} stuck campaigns.`);
+      }
+    } catch (err) {
+      console.error('[Queue Worker] Stuck jobs recovery failed:', err.message);
+    }
+  })();
+
   intervalId = setInterval(async () => {
     try {
       await processNextJob();

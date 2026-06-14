@@ -186,7 +186,8 @@ const connectDB = async () => {
   try {
     mongoose.set('strictQuery', false);
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/crm_db', {
-      serverSelectionTimeoutMS: 3000 // 3 seconds timeout to fail fast
+      serverSelectionTimeoutMS: 30000, // 30 seconds timeout to survive container cold starts
+      maxPoolSize: 10 // Prevent connection exhaustion on Render free tier
     });
     console.log('✅ MongoDB connected successfully.');
   } catch (err) {

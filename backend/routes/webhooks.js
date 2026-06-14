@@ -16,6 +16,9 @@ router.post('/delivery-callback', async (req, res) => {
       return res.status(404).json({ error: `Communication log ${logId} not found.` });
     }
 
+    // To avoid double counting, check if this status was already logged
+    const alreadyExists = log.events.some(e => e.status === status);
+
     // Capture the state transition
     const oldStatus = log.status;
     log.status = status;
@@ -24,8 +27,12 @@ router.post('/delivery-callback', async (req, res) => {
 
     console.log(`[Webhook] Log ID ${logId} updated: ${oldStatus} -> ${status}`);
 
+    if (alreadyExists) {
+      console.log(`[Webhook] Status ${status} already logged for Log ID ${logId}. Skipping campaign count increment.`);
+      return res.json({ success: true, message: `Status ${status} already logged, skipping count increment.` });
+    }
+
     // Update Campaign aggregated counts depending on the event
-    // To avoid double counting, we increment only on the first arrival of this status
     // Mongoose `$inc` is atomic and safe
     const updateInc = {};
     
