@@ -138,32 +138,45 @@ async function processNextJob() {
 
         const channelUrl = `${process.env.CHANNEL_SERVICE_URL || 'https://xenocrm-channel-service.onrender.com'}/api/send`;
         
-        // Retry logic for 429 rate limits
+        // Retry logic for rate limits and cold-start timeouts
         let success = false;
         let dispatchAttempts = 0;
-        const maxDispatchAttempts = 3;
+        const maxDispatchAttempts = 5;
         
         while (!success && dispatchAttempts < maxDispatchAttempts) {
           try {
             dispatchAttempts++;
-            await axios.post(channelUrl, payload, { timeout: 2500 });
+            // 45 seconds timeout to allow sleeping Render instances to wake up
+            await axios.post(channelUrl, payload, { timeout: 45000 });
             success = true;
           } catch (err) {
-            const isRateLimit = err.response && err.response.status === 429;
-            if (isRateLimit && dispatchAttempts < maxDispatchAttempts) {
-              // Parse the standard 'Retry-After' header (if sent by Cloudflare/Render)
-              let retrySeconds = 2; 
-              const retryHeader = err.response.headers && err.response.headers['retry-after'];
-              if (retryHeader) {
-                const parsed = parseInt(retryHeader, 10);
-                if (!isNaN(parsed)) {
-                  retrySeconds = parsed;
+            const status = err.response ? err.response.status : null;
+            // Retry on rate limit, gateway proxy errors, or request timeouts
+            const isRetryable = 
+              status === 429 || 
+              status === 502 || 
+              status === 503 || 
+              status === 504 || 
+              err.code === 'ECONNABORTED' || 
+              err.message.includes('timeout') ||
+              !err.response; // Network connection drops/timeouts
+
+            if (isRetryable && dispatchAttempts < maxDispatchAttempts) {
+              let retrySeconds = 5; // Default 5 seconds cooldown to let server boot/recover
+              if (status === 429) {
+                retrySeconds = 3;
+                const retryHeader = err.response.headers && err.response.headers['retry-after'];
+                if (retryHeader) {
+                  const parsed = parseInt(retryHeader, 10);
+                  if (!isNaN(parsed)) {
+                    retrySeconds = parsed;
+                  }
                 }
               }
-              console.warn(`[Queue Worker] Rate limited (429) when sending to ${customer.name}. Retrying in ${retrySeconds}s... (Attempt ${dispatchAttempts}/${maxDispatchAttempts})`);
+              console.warn(`[Queue Worker] Retryable error (${status || err.code || 'Network/Timeout'}) when sending to ${customer.name}. Retrying in ${retrySeconds}s... (Attempt ${dispatchAttempts}/${maxDispatchAttempts})`);
               await new Promise(resolve => setTimeout(resolve, retrySeconds * 1000));
             } else {
-              throw err; // Fail if it's a different error or we ran out of attempts
+              throw err; // Fail if it's not retryable or we ran out of attempts
             }
           }
         }
@@ -185,8 +198,8 @@ async function processNextJob() {
         await Campaign.updateOne({ _id: campaign._id }, { $inc: { failedCount: 1 } });
       }
 
-      // Introduce a 200ms throttle delay to avoid 429 Too Many Requests from Render's load balancer
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Introduce a 1000ms (1s) throttle delay to avoid 429 Too Many Requests from Render's load balancer
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     campaign.status = 'Completed';
